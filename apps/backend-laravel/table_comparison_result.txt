@@ -1,0 +1,37 @@
+=== HASIL PERBANDINGAN TABEL ===
+
+Total tabel yang ada di database: 29
+Total tabel yang diharapkan: 14
+
+✅ Semua tabel sudah ada di database
+
+=== DAFTAR TABEL DI DATABASE ===
+  - admin_kecamatan_desa
+  - aktivitas_sistem
+  - cache
+  - cache_locks
+  - desa
+  - failed_jobs
+  - fitur_peta
+  - indikator_data
+  - jobs
+  - job_batches
+  - kecamatan
+  - kematian
+  - konten
+  - lapisan_peta
+  - migrations
+  - model_has_permissions
+  - model_has_roles
+  - nilai_data_mentah
+  - opd
+  - password_reset_tokens
+  - pengajuan_data
+  - pengguna
+  - periode_data
+  - permissions
+  - personal_access_tokens
+  - ringkasan_statistik
+  - roles
+  - role_has_permissions
+  - sessions
