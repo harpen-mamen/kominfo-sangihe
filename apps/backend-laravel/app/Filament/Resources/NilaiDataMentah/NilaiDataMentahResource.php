@@ -49,7 +49,7 @@ class NilaiDataMentahResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return FilamentWorkspace::canAccessWorkflow();
+        return FilamentWorkspace::isKominfo();
     }
 
     public static function form(Schema $schema): Schema
@@ -97,7 +97,22 @@ class NilaiDataMentahResource extends Resource
                         ->noOptionsMessage('Belum ada sumber data yang sesuai untuk indikator dan kecamatan ini.')
                         ->searchable()
                         ->preload(),
-                    TextInput::make('nilai')->numeric()->required()->minValue(0),
+                    Select::make('tipe_sumber')
+                        ->options([
+                            'desa' => 'Desa',
+                            'kecamatan' => 'Kecamatan',
+                            'opd' => 'OPD',
+                            'fasilitas' => 'Fasilitas',
+                        ])
+                        ->default('desa')
+                        ->required(),
+                    TextInput::make('sumber_id')->numeric()->label('ID Sumber'),
+                    TextInput::make('nilai_decimal')->numeric()->label('Nilai Numerik')->minValue(0),
+                    TextInput::make('nilai_text')->label('Nilai Teks'),
+                    Select::make('is_tidak_tersedia')
+                        ->label('Tidak Tersedia')
+                        ->options([false => 'Tidak', true => 'Ya'])
+                        ->default(false),
                     Textarea::make('catatan')->rows(3)->columnSpanFull(),
                 ])
                 ->columns(2),
@@ -122,7 +137,9 @@ class NilaiDataMentahResource extends Resource
                 TextColumn::make('desa.nama')->label('Desa')->searchable(),
                 TextColumn::make('indikatorData.nama')->label('Indikator')->searchable(),
                 TextColumn::make('sumberData.nama')->label('Sumber Data')->placeholder('-'),
-                TextColumn::make('nilai')->numeric(decimalPlaces: 2)->sortable(),
+                TextColumn::make('tipe_sumber')->label('Tipe')->badge(),
+                TextColumn::make('nilai_decimal')->label('Nilai')->numeric(decimalPlaces: 2)->sortable(),
+                TextColumn::make('nilai_text')->label('Nilai Teks')->placeholder('-')->toggleable(),
                 TextColumn::make('updated_at')->dateTime('d M Y H:i')->toggleable(),
             ])
             ->filters([
@@ -131,7 +148,13 @@ class NilaiDataMentahResource extends Resource
                     : Desa::query()->where('aktif', true)->orderBy('nama')->pluck('nama', 'id')->all())->searchable()->preload(),
                 SelectFilter::make('indikator_data_id')->label('Indikator')->options(fn (): array => static::indikatorOptions())->searchable()->preload(),
             ])
-            ->recordActions([ViewAction::make(), EditAction::make(), DeleteAction::make()])
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make()
+                    ->visible(fn (): bool => ! FilamentWorkspace::isKominfo()),
+                DeleteAction::make()
+                    ->visible(fn (): bool => ! FilamentWorkspace::isKominfo()),
+            ])
             ->toolbarActions([BulkActionGroup::make([DeleteBulkAction::make()])]);
     }
 
@@ -151,9 +174,7 @@ class NilaiDataMentahResource extends Resource
             ? AdminScope::indikatorDataQuery($user, forInput: true)
             : IndikatorData::query()->where('aktif', true);
 
-        return $query
-            ->orderBy('urutan')
-            ->orderBy('nama')
+        return AdminScope::orderIndikatorQuery($query)
             ->pluck('nama', 'id')
             ->all();
     }

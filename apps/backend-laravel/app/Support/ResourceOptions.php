@@ -11,11 +11,11 @@ class ResourceOptions
     {
         return [
             'draft' => 'Draft',
-            'diajukan' => 'Diajukan',
+            'diajukan' => 'Menunggu Peninjauan',
             'revisi' => 'Revisi',
             'terverifikasi' => 'Terverifikasi',
-            'terbit' => 'Terbit',
             'ditolak' => 'Ditolak',
+            'terbit' => 'Terbit',
         ];
     }
 
@@ -39,6 +39,38 @@ class ResourceOptions
         return [
             'desa' => 'Desa',
             'kecamatan' => 'Kecamatan',
+            'opd' => 'OPD',
+            'fasilitas' => 'Fasilitas',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function tipeNilai(): array
+    {
+        return [
+            'integer' => 'Integer',
+            'decimal' => 'Decimal',
+            'percent' => 'Persen',
+            'currency' => 'Rupiah',
+            'text' => 'Teks',
+            'boolean' => 'Ya/Tidak',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function metodeAgregasi(): array
+    {
+        return [
+            'sum' => 'Jumlah',
+            'average' => 'Rata-rata',
+            'weighted_average' => 'Rata-rata berbobot',
+            'latest' => 'Nilai terbaru',
+            'count' => 'Hitung record',
+            'formula' => 'Formula',
         ];
     }
 
@@ -66,6 +98,7 @@ class ResourceOptions
         return [
             'desa' => 'Desa',
             'kecamatan' => 'Kecamatan',
+            'kabupaten' => 'Kabupaten',
             'opd' => 'OPD',
         ];
     }
@@ -133,6 +166,10 @@ class ResourceOptions
             'kesehatan' => 'Kesehatan',
             'penyakit' => 'Penyakit',
             'fasilitas' => 'Fasilitas',
+            'ekonomi' => 'Ekonomi',
+            'infrastruktur' => 'Infrastruktur',
+            'sosial' => 'Sosial',
+            'lainnya' => 'Lainnya',
         ];
     }
 

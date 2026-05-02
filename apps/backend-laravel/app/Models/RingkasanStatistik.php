@@ -13,6 +13,10 @@ class RingkasanStatistik extends ModelIndonesia
         return [
             'nilai_total' => 'decimal:2',
             'nilai_persen' => 'decimal:2',
+            'persentase_kelengkapan' => 'decimal:2',
+            'jumlah_sumber_masuk' => 'integer',
+            'jumlah_sumber_wajib' => 'integer',
+            'published_at' => 'datetime',
         ];
     }
 

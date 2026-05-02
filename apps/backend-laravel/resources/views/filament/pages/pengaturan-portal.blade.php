@@ -67,13 +67,37 @@
 
                     @if ($heroBackgroundType === 'image')
                         <label style="display: grid; gap: 0.35rem;">
-                            <span>Upload Gambar Hero</span>
+                            <span>Upload Gambar Hero Utama</span>
                             <input type="file" wire:model="heroBackgroundImageUpload" accept=".jpg,.jpeg,.png,.webp,image/*" style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem;">
                             @if ($this->heroBackgroundImageUrl)
                                 <small style="color: #64748b;">Aktif: {{ $this->heroBackgroundImagePath }}</small>
                             @endif
                             @error('heroBackgroundImageUpload') <small style="color: #dc2626;">{{ $message }}</small> @enderror
                         </label>
+
+                        <label style="display: grid; gap: 0.35rem;">
+                            <span>Tambah Beberapa Gambar Hero</span>
+                            <input type="file" wire:model="heroBackgroundImageUploads" multiple accept=".jpg,.jpeg,.png,.webp,image/*" style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem;">
+                            <small style="color: #64748b;">Bisa pilih banyak foto sekaligus. Tidak berlaku untuk mode video.</small>
+                            @error('heroBackgroundImageUploads') <small style="color: #dc2626;">{{ $message }}</small> @enderror
+                            @error('heroBackgroundImageUploads.*') <small style="color: #dc2626;">{{ $message }}</small> @enderror
+                        </label>
+
+                        @if (count($this->heroBackgroundImageUrls))
+                            <div style="grid-column: 1 / -1; display: grid; gap: 0.65rem;">
+                                <span style="font-weight: 600;">Gambar Hero Aktif</span>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
+                                    @foreach ($this->heroBackgroundImageUrls as $index => $url)
+                                        <div style="border: 1px solid #d1d5db; border-radius: 0.75rem; overflow: hidden; background: #f8fafc;">
+                                            <div style="aspect-ratio: 16 / 9;">
+                                                <img src="{{ $url }}" alt="Gambar hero {{ $index + 1 }}" style="width:100%; height:100%; object-fit:cover;">
+                                            </div>
+                                            <small style="display:block; padding: 0.45rem 0.6rem; color:#64748b;">#{{ $index + 1 }}</small>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @else
                         <label style="display: grid; gap: 0.35rem;">
                             <span>Upload Video Hero</span>

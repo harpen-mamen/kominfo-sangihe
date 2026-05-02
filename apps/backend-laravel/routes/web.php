@@ -5,10 +5,33 @@ use App\Models\Desa;
 use App\Models\DokumenPublik;
 use App\Models\Kecamatan;
 use App\Support\ResourceOptions;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/storage/{path}', function (string $path) {
+    $path = ltrim($path, '/');
+
+    abort_if($path === '' || str_contains($path, '..'), 404);
+    abort_unless(Storage::disk('public')->exists($path), 404);
+
+    return response()->file(Storage::disk('public')->path($path), [
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->where('path', '.*')->name('storage.public');
+
+Route::get('/storage-files/{path}', function (string $path) {
+    $path = ltrim($path, '/');
+
+    abort_if($path === '' || str_contains($path, '..'), 404);
+    abort_unless(Storage::disk('public')->exists($path), 404);
+
+    return response()->file(Storage::disk('public')->path($path), [
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->where('path', '.*')->name('storage.files');
 
 Route::get('/dokumen', function () {
     $documents = DokumenPublik::query()

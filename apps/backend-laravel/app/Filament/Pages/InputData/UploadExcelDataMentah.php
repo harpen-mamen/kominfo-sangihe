@@ -8,20 +8,25 @@ use App\Models\NilaiDataMentah;
 use App\Models\PengajuanData;
 use App\Models\PeriodeData;
 use App\Models\SumberData;
+use App\Support\AdminScope;
 use App\Support\FilamentWorkspace;
 use BackedEnum;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Livewire\WithFileUploads;
+use ZipArchive;
 
 class UploadExcelDataMentah extends Page
 {
     use HasPageShield {
         canAccess as shieldCanAccess;
     }
+    use WithFileUploads;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
 
@@ -33,7 +38,11 @@ class UploadExcelDataMentah extends Page
 
     protected string $view = 'filament.pages.input-data.upload-excel';
 
+    public ?int $periodeId = null;
+
     public ?int $periodeDataId = null;
+
+    public mixed $file = null;
 
     public string $csvContent = '';
 
@@ -41,17 +50,48 @@ class UploadExcelDataMentah extends Page
 
     public function mount(): void
     {
-        $this->periodeDataId = PeriodeData::query()->where('terkunci', false)->orderByDesc('tahun')->orderByDesc('bulan')->value('id');
+        $this->periodeDataId = $this->periodeQuery()->value('id');
+        $this->periodeId = $this->periodeDataId;
     }
 
     public static function canAccess(): bool
     {
-        return static::shieldCanAccess() && FilamentWorkspace::canAccessWorkflow();
+        return static::shieldCanAccess() && (FilamentWorkspace::isSubdistrict() || FilamentWorkspace::isDepartment());
     }
 
     public function getPeriodeOptionsProperty(): array
     {
-        return PeriodeData::query()->where('terkunci', false)->orderByDesc('tahun')->orderByDesc('bulan')->pluck('label', 'id')->all();
+        return $this->periodeQuery()->pluck('label', 'id')->all();
+    }
+
+    public function getPeriodesProperty()
+    {
+        return $this->periodeQuery()->get();
+    }
+
+    public function getIndikatorsProperty()
+    {
+        $user = FilamentWorkspace::user();
+        $query = $user
+            ? AdminScope::indikatorDataQuery($user, forInput: true)
+            : IndikatorData::query()->where('aktif', true);
+
+        return AdminScope::orderIndikatorQuery($query)->get();
+    }
+
+    public function updatedPeriodeId(?int $value): void
+    {
+        $this->periodeDataId = $value;
+    }
+
+    public function updatedPeriodeDataId(?int $value): void
+    {
+        $this->periodeId = $value;
+    }
+
+    public function import(): void
+    {
+        $this->save();
     }
 
     public function preview(): void
@@ -61,7 +101,22 @@ class UploadExcelDataMentah extends Page
 
     public function save(): void
     {
+        $this->periodeDataId = $this->periodeId ?: $this->periodeDataId;
+
+        if (! $this->periodeDataId) {
+            Notification::make()->title('Pilih periode terlebih dahulu.')->danger()->send();
+
+            return;
+        }
+
         $rows = $this->previewRows ?: $this->parseRows();
+
+        if ($rows === []) {
+            Notification::make()->title('Tidak ada baris valid untuk diproses.')->danger()->send();
+
+            return;
+        }
+
         $pengajuan = $this->pengajuanFor();
         $saved = 0;
 
@@ -75,8 +130,11 @@ class UploadExcelDataMentah extends Page
                 'desa_id' => $row['desa_id'],
                 'indikator_data_id' => $row['indikator_id'],
                 'sumber_data_id' => $row['sumber_data_id'],
+                'tipe_sumber' => 'desa',
+                'sumber_id' => $row['desa_id'],
             ], [
-                'nilai' => $row['nilai'],
+                'nilai_decimal' => $row['nilai'],
+                'nilai_text' => $row['catatan'] ?? null,
             ]);
 
             $saved++;
@@ -95,18 +153,81 @@ class UploadExcelDataMentah extends Page
 
     private function parseRows(): array
     {
-        $lines = preg_split('/\r\n|\r|\n/', trim($this->csvContent));
-        $rows = [];
+        if ($this->file) {
+            return $this->parseUploadedFile();
+        }
 
-        foreach (array_slice($lines ?: [], 1) as $index => $line) {
+        return $this->parseCsvContent($this->csvContent);
+    }
+
+    private function parseUploadedFile(): array
+    {
+        $this->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:10240'],
+        ]);
+
+        $path = $this->file->getRealPath();
+        $extension = strtolower((string) $this->file->getClientOriginalExtension());
+
+        if (in_array($extension, ['csv', 'txt'], true)) {
+            return $this->parseCsvContent((string) file_get_contents($path));
+        }
+
+        if ($extension === 'xlsx') {
+            return $this->parseMatrix($this->readXlsxRows($path));
+        }
+
+        Notification::make()
+            ->title('Format .xls belum bisa diproses otomatis.')
+            ->body('Simpan ulang file sebagai .xlsx atau .csv, lalu upload kembali.')
+            ->danger()
+            ->send();
+
+        return [];
+    }
+
+    private function parseCsvContent(string $content): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', trim($content));
+        $matrix = [];
+
+        foreach ($lines ?: [] as $line) {
             if (blank($line)) {
                 continue;
             }
 
-            $columns = str_getcsv($line);
-            [$kodeDesa, $kodeIndikator, $sumberData, $nilai] = array_pad($columns, 4, null);
+            $matrix[] = str_getcsv($line);
+        }
 
-            $desa = Desa::query()->where('kode', trim((string) $kodeDesa))->first();
+        return $this->parseMatrix($matrix);
+    }
+
+    private function parseMatrix(array $matrix): array
+    {
+        if ($matrix === []) {
+            return [];
+        }
+
+        $headers = array_map(fn ($header): string => $this->normalizeHeader((string) $header), array_shift($matrix));
+        $rows = [];
+
+        foreach ($matrix as $index => $columns) {
+            $row = [];
+
+            foreach ($headers as $columnIndex => $header) {
+                $row[$header] = $columns[$columnIndex] ?? null;
+            }
+
+            $kodeDesa = $row['kode_desa'] ?? null;
+            $namaDesa = $row['nama_desa'] ?? $row['desa'] ?? null;
+            $kodeIndikator = $row['kode_indikator'] ?? $row['indikator'] ?? null;
+            $sumberData = $row['sumber_data'] ?? null;
+            $nilai = $row['nilai'] ?? null;
+            $catatan = $row['catatan'] ?? null;
+
+            $desa = filled($kodeDesa)
+                ? Desa::query()->where('kode', trim((string) $kodeDesa))->first()
+                : Desa::query()->where('nama', trim((string) $namaDesa))->first();
             $indikator = IndikatorData::query()->where('kode', trim((string) $kodeIndikator))->first();
             $sumber = filled($sumberData) ? SumberData::query()->where('nama', trim((string) $sumberData))->first() : null;
             $errors = [];
@@ -133,6 +254,7 @@ class UploadExcelDataMentah extends Page
                 'kode_indikator' => $kodeIndikator,
                 'sumber_data' => $sumberData,
                 'nilai' => (float) $nilai,
+                'catatan' => $catatan,
                 'desa_id' => $desa?->id,
                 'indikator_id' => $indikator?->id,
                 'sumber_data_id' => $sumber?->id,
@@ -141,6 +263,108 @@ class UploadExcelDataMentah extends Page
         }
 
         return $rows;
+    }
+
+    private function normalizeHeader(string $header): string
+    {
+        return str($header)
+            ->lower()
+            ->replace([' ', '-'], '_')
+            ->replaceMatches('/[^a-z0-9_]/', '')
+            ->value();
+    }
+
+    private function readXlsxRows(string $path): array
+    {
+        $zip = new ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            return [];
+        }
+
+        $sharedStrings = $this->readSharedStrings($zip);
+        $worksheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        if ($worksheetXml === false) {
+            return [];
+        }
+
+        $worksheet = simplexml_load_string($worksheetXml);
+
+        if (! $worksheet) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($worksheet->sheetData->row as $sheetRow) {
+            $row = [];
+
+            foreach ($sheetRow->c as $cell) {
+                $reference = (string) $cell['r'];
+                $columnIndex = $this->columnIndexFromReference($reference);
+                $type = (string) $cell['t'];
+                $value = (string) ($cell->v ?? '');
+
+                if ($type === 's') {
+                    $value = $sharedStrings[(int) $value] ?? '';
+                } elseif ($type === 'inlineStr') {
+                    $value = (string) ($cell->is->t ?? '');
+                }
+
+                $row[$columnIndex] = $value;
+            }
+
+            if ($row !== []) {
+                ksort($row);
+                $rows[] = array_values($row);
+            }
+        }
+
+        return $rows;
+    }
+
+    private function readSharedStrings(ZipArchive $zip): array
+    {
+        $xml = $zip->getFromName('xl/sharedStrings.xml');
+
+        if ($xml === false) {
+            return [];
+        }
+
+        $shared = simplexml_load_string($xml);
+
+        if (! $shared) {
+            return [];
+        }
+
+        $strings = [];
+
+        foreach ($shared->si as $item) {
+            if (isset($item->t)) {
+                $strings[] = (string) $item->t;
+                continue;
+            }
+
+            $strings[] = collect($item->r ?? [])
+                ->map(fn ($run): string => (string) ($run->t ?? ''))
+                ->implode('');
+        }
+
+        return $strings;
+    }
+
+    private function columnIndexFromReference(string $reference): int
+    {
+        $letters = preg_replace('/[^A-Z]/', '', strtoupper($reference)) ?: 'A';
+        $index = 0;
+
+        foreach (str_split($letters) as $letter) {
+            $index = ($index * 26) + (ord($letter) - 64);
+        }
+
+        return $index - 1;
     }
 
     private function pengajuanFor(): PengajuanData
@@ -161,5 +385,17 @@ class UploadExcelDataMentah extends Page
             'status' => 'draft',
             'tanggal_kirim' => Carbon::now(),
         ]);
+    }
+
+    private function periodeQuery(): Builder
+    {
+        return PeriodeData::query()
+            ->where(function (Builder $query): void {
+                $query
+                    ->where('terkunci', false)
+                    ->orWhereNull('terkunci');
+            })
+            ->orderByDesc('tahun')
+            ->orderByDesc('bulan');
     }
 }

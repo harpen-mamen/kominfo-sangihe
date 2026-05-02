@@ -6,6 +6,8 @@ namespace App\Policies;
 
 use Illuminate\Foundation\Auth\User as AuthUser;
 use App\Models\PengajuanData;
+use App\Models\User;
+use App\Support\AdminScope;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class PengajuanDataPolicy
@@ -19,6 +21,11 @@ class PengajuanDataPolicy
 
     public function view(AuthUser $authUser, PengajuanData $pengajuanData): bool
     {
+        if ($authUser instanceof User && AdminScope::isSubdistrict($authUser)) {
+            return $authUser->can('View:PengajuanData')
+                && (int) $pengajuanData->kecamatan_id === (int) $authUser->kecamatan_id;
+        }
+
         return $authUser->can('View:PengajuanData');
     }
 
@@ -29,6 +36,15 @@ class PengajuanDataPolicy
 
     public function update(AuthUser $authUser, PengajuanData $pengajuanData): bool
     {
+        if (! $pengajuanData->canInputValues()) {
+            return false;
+        }
+
+        if ($authUser instanceof User && AdminScope::isSubdistrict($authUser)) {
+            return $authUser->can('Update:PengajuanData')
+                && (int) $pengajuanData->kecamatan_id === (int) $authUser->kecamatan_id;
+        }
+
         return $authUser->can('Update:PengajuanData');
     }
 

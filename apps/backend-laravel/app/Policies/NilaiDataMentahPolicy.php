@@ -6,6 +6,8 @@ namespace App\Policies;
 
 use Illuminate\Foundation\Auth\User as AuthUser;
 use App\Models\NilaiDataMentah;
+use App\Models\User;
+use App\Support\AdminScope;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class NilaiDataMentahPolicy
@@ -19,6 +21,11 @@ class NilaiDataMentahPolicy
 
     public function view(AuthUser $authUser, NilaiDataMentah $nilaiDataMentah): bool
     {
+        if ($authUser instanceof User && AdminScope::isSubdistrict($authUser)) {
+            return $authUser->can('View:NilaiDataMentah')
+                && (int) $nilaiDataMentah->pengajuanData?->kecamatan_id === (int) $authUser->kecamatan_id;
+        }
+
         return $authUser->can('View:NilaiDataMentah');
     }
 
@@ -29,6 +36,15 @@ class NilaiDataMentahPolicy
 
     public function update(AuthUser $authUser, NilaiDataMentah $nilaiDataMentah): bool
     {
+        if (! $nilaiDataMentah->pengajuanData?->canInputValues()) {
+            return false;
+        }
+
+        if ($authUser instanceof User && AdminScope::isSubdistrict($authUser)) {
+            return $authUser->can('Update:NilaiDataMentah')
+                && (int) $nilaiDataMentah->pengajuanData?->kecamatan_id === (int) $authUser->kecamatan_id;
+        }
+
         return $authUser->can('Update:NilaiDataMentah');
     }
 

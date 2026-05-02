@@ -13,4 +13,6 @@ class LaporanIndikatorDaerah extends StatistikDaerahPage
     protected static ?string $navigationLabel = 'Laporan Indikator Daerah';
 
     protected static ?int $navigationSort = 10;
+
+    protected string $view = 'filament.pages.laporan-indikator-daerah';
 }

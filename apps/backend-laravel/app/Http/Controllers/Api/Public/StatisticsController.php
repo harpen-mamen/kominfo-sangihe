@@ -118,9 +118,14 @@ class StatisticsController extends Controller
                 'desa',
                 'opd',
                 'indikator',
+                'kategori',
                 'satuan',
+                'metode_agregasi',
                 'nilai_total',
                 'nilai_persen',
+                'cakupan_persen',
+                'status_rekap',
+                'published_at',
             ]);
 
             $rows->each(function (RingkasanStatistik $row) use ($handle): void {
@@ -133,9 +138,14 @@ class StatisticsController extends Controller
                     $row->desa?->nama,
                     $row->opd?->nama,
                     $row->indikatorData?->nama,
+                    $row->indikatorData?->kategori ?: $row->indikatorData?->kelompok,
                     $row->indikatorData?->satuan,
+                    $row->indikatorData?->metode_agregasi,
                     (float) $row->nilai_total,
                     $row->nilai_persen !== null ? (float) $row->nilai_persen : null,
+                    (float) $row->persentase_kelengkapan,
+                    $row->status_rekap,
+                    $row->published_at?->toDateTimeString(),
                 ]);
             });
 
@@ -171,7 +181,20 @@ class StatisticsController extends Controller
     {
         return RingkasanStatistik::query()
             ->with(['indikatorData.opd', 'periodeData', 'kecamatan', 'desa', 'opd'])
+            ->where('status_publikasi', 'publik')
+            ->whereHas('indikatorData', function ($query) use ($request): void {
+                $query
+                    ->where('aktif', true)
+                    ->where('boleh_publikasi', true)
+                    ->when($request->filled('kategori'), fn ($builder) => $builder->where(function ($inner) use ($request): void {
+                        $inner
+                            ->where('kategori', $request->string('kategori')->toString())
+                            ->orWhere('kelompok', $request->string('kategori')->toString());
+                    }));
+            })
             ->when($request->integer('periode_id'), fn ($query, int $id) => $query->where('periode_data_id', $id))
+            ->when($request->integer('tahun'), fn ($query, int $tahun) => $query->whereHas('periodeData', fn ($periodQuery) => $periodQuery->where('tahun', $tahun)))
+            ->when($request->integer('bulan'), fn ($query, int $bulan) => $query->whereHas('periodeData', fn ($periodQuery) => $periodQuery->where('bulan', $bulan)))
             ->when($request->integer('indikator_id'), fn ($query, int $id) => $query->where('indikator_data_id', $id))
             ->when($request->integer('opd_id'), fn ($query, int $id) => $query->where(function ($builder) use ($id): void {
                 $builder
@@ -192,7 +215,21 @@ class StatisticsController extends Controller
             'kecamatan' => Kecamatan::query()->where('aktif', true)->orderBy('nama')->get(['id', 'nama']),
             'desa' => Desa::query()->where('aktif', true)->orderBy('nama')->get(['id', 'kecamatan_id', 'nama']),
             'opd' => Opd::query()->where('aktif', true)->orderBy('nama')->get(['id', 'kode', 'nama']),
-            'indikator' => IndikatorData::query()->where('aktif', true)->orderBy('urutan')->orderBy('nama')->get(['id', 'opd_id', 'kode', 'nama', 'satuan', 'kelompok']),
+            'kategori' => IndikatorData::query()
+                ->where('aktif', true)
+                ->where('boleh_publikasi', true)
+                ->selectRaw('COALESCE(kategori, kelompok) as nama')
+                ->distinct()
+                ->orderBy('nama')
+                ->pluck('nama')
+                ->values(),
+            'indikator' => IndikatorData::query()
+                ->where('aktif', true)
+                ->where('boleh_publikasi', true)
+                ->orderBy('urutan_tampil')
+                ->orderBy('urutan')
+                ->orderBy('nama')
+                ->get(['id', 'opd_id', 'kode', 'nama', 'satuan', 'kelompok', 'kategori', 'metode_agregasi']),
         ];
     }
 
@@ -209,8 +246,9 @@ class StatisticsController extends Controller
                 return [
                     'indicator' => $first?->indikatorData?->nama,
                     'unit' => $first?->indikatorData?->satuan,
-                    'value' => (float) $items->sum('nilai_total'),
+                    'value' => (float) ($items->firstWhere('tingkat_rekap', 'kabupaten')?->nilai_total ?? $items->first()?->nilai_total ?? 0),
                     'period' => $first?->periodeData?->label,
+                    'status_rekap' => $first?->status_rekap,
                 ];
             })
             ->take(6)
@@ -226,8 +264,8 @@ class StatisticsController extends Controller
 
                 return [
                     'period' => $first?->periodeData?->label ?? 'Periode',
-                    'value' => (float) $items->sum('nilai_total'),
-                ];
+                'value' => (float) ($items->where('tingkat_rekap', 'kabupaten')->sum('nilai_total') ?: $items->sum('nilai_total')),
+            ];
             })
             ->values();
     }
@@ -242,6 +280,7 @@ class StatisticsController extends Controller
             ->map(fn ($items, string $area): array => [
                 'area' => $area,
                 'value' => (float) $items->sum('nilai_total'),
+                'status_rekap' => $items->contains(fn (RingkasanStatistik $row): bool => $row->status_rekap !== 'final') ? 'sementara' : 'final',
             ])
             ->sortByDesc('value')
             ->take(12)
@@ -269,9 +308,19 @@ class StatisticsController extends Controller
             'indikator_id' => $snapshot->indikator_data_id,
             'indikator' => $snapshot->indikatorData?->nama,
             'indikator_kode' => $snapshot->indikatorData?->kode,
+            'kategori' => $snapshot->indikatorData?->kategori ?: $snapshot->indikatorData?->kelompok,
             'satuan' => $snapshot->indikatorData?->satuan,
+            'metode_agregasi' => $snapshot->indikatorData?->metode_agregasi,
             'nilai_total' => (float) $snapshot->nilai_total,
             'nilai_persen' => $snapshot->nilai_persen !== null ? (float) $snapshot->nilai_persen : null,
+            'cakupan' => [
+                'jumlah_sumber_masuk' => (int) $snapshot->jumlah_sumber_masuk,
+                'jumlah_sumber_wajib' => (int) $snapshot->jumlah_sumber_wajib,
+                'persentase_kelengkapan' => (float) $snapshot->persentase_kelengkapan,
+            ],
+            'status_rekap' => $snapshot->status_rekap,
+            'updated_at' => $snapshot->updated_at?->toISOString(),
+            'published_at' => $snapshot->published_at?->toISOString(),
         ];
     }
 }

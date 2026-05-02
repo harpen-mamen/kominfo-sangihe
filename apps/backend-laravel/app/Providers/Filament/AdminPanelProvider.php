@@ -71,6 +71,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('Kominfo Sangihe')
             ->brandLogo(asset('adminlte-assets/img/logo-sangihe.png'))
             ->brandLogoHeight('2.35rem')
+            ->favicon(asset('favicon.ico'))
             ->login()
             ->defaultThemeMode(ThemeMode::Light)
             ->sidebarCollapsibleOnDesktop()
@@ -79,9 +80,9 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(Width::Full)
             ->colors([
                 'primary' => Color::Sky,
-                'info' => Color::Cyan,
+                'info' => Color::Blue,
                 'warning' => Color::Amber,
-                'success' => Color::Teal,
+                'success' => Color::Emerald,
                 'danger' => Color::Rose,
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
@@ -129,10 +130,10 @@ class AdminPanelProvider extends PanelProvider
                 PengaturanPortal::class,
             ])
             ->widgets([
-                AdminDashboardShowcase::class,
+                AccountWidget::class,
                 AdminOverview::class,
                 VerificationInbox::class,
-                AccountWidget::class,
+                AdminDashboardShowcase::class,
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -56,7 +56,20 @@ class PengajuanData extends ModelIndonesia
             'tanggal_kirim' => 'datetime',
             'tanggal_verifikasi' => 'datetime',
             'tanggal_terbit' => 'datetime',
+            'submitted_at' => 'datetime',
+            'verified_at' => 'datetime',
+            'published_at' => 'datetime',
         ];
+    }
+
+    public function canInputValues(): bool
+    {
+        return in_array($this->status, ['draft', 'revisi'], true);
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === 'terbit';
     }
 
     public function kecamatan(): BelongsTo
@@ -92,6 +105,21 @@ class PengajuanData extends ModelIndonesia
     public function verifikator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'diverifikasi_oleh');
+    }
+
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function verifiedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function publishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by');
     }
 
     public function nilaiDataMentah(): HasMany

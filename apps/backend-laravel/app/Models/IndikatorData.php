@@ -36,12 +36,28 @@ class IndikatorData extends ModelIndonesia
             'aktif' => 'boolean',
             'boleh_diinput_kecamatan' => 'boolean',
             'boleh_diinput_opd' => 'boolean',
+            'boleh_publikasi' => 'boolean',
+            'wajib_diisi' => 'boolean',
+            'batas_min' => 'decimal:4',
+            'batas_max' => 'decimal:4',
+            'urutan' => 'integer',
+            'urutan_tampil' => 'integer',
         ];
     }
 
     public function opd(): BelongsTo
     {
         return $this->belongsTo(Opd::class);
+    }
+
+    public function opdPembina(): BelongsTo
+    {
+        return $this->belongsTo(Opd::class, 'opd_pembina_id');
+    }
+
+    public function getKategoriIndikatorAttribute(): ?string
+    {
+        return $this->kategori ?: $this->kelompok;
     }
 
     public function nilaiDataMentah(): HasMany

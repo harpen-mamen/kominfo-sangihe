@@ -7,24 +7,29 @@
     --fi-color-primary-50: #eff6ff;
     --fi-color-primary-100: #dbeafe;
     --fi-color-primary-200: #bfdbfe;
-    --fi-color-primary-300: #93c5fd;
-    --fi-color-primary-400: #60a5fa;
-    --fi-color-primary-500: #0d6efd;
-    --fi-color-primary-600: #0b5ed7;
-    --fi-color-primary-700: #0a58ca;
-    --fi-color-primary-800: #084298;
-    --fi-color-primary-900: #052c65;
-    --fi-color-primary-950: #031633;
-    --adminlte-sidebar: #343a40;
-    --adminlte-sidebar-deep: #212529;
-    --adminlte-body: #f4f6f9;
-    --adminlte-border: #dee2e6;
-    --adminlte-muted: #6c757d;
-    --adminlte-info: #0dcaf0;
-    --adminlte-success: #198754;
-    --adminlte-warning: #ffc107;
-    --adminlte-danger: #dc3545;
-    --adminlte-card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --fi-color-primary-300: #7dd3fc;
+    --fi-color-primary-400: #38bdf8;
+    --fi-color-primary-500: #0ea5e9;
+    --fi-color-primary-600: #0284c7;
+    --fi-color-primary-700: #0369a1;
+    --fi-color-primary-800: #075985;
+    --fi-color-primary-900: #0c4a6e;
+    --fi-color-primary-950: #082f49;
+    --adminlte-sidebar: #111827;
+    --adminlte-sidebar-deep: #0f172a;
+    --adminlte-sidebar-text: #cbd5e1;
+    --adminlte-sidebar-muted: #94a3b8;
+    --adminlte-sidebar-active: #2563eb;
+    --adminlte-sidebar-hover: rgba(59, 130, 246, 0.18);
+    --adminlte-body: #f8fafc;
+    --adminlte-surface: #ffffff;
+    --adminlte-border: #e5e7eb;
+    --adminlte-muted: #64748b;
+    --adminlte-info: #2563eb;
+    --adminlte-success: #10b981;
+    --adminlte-warning: #f59e0b;
+    --adminlte-danger: #e11d48;
+    --adminlte-card-shadow: 0 0.35rem 1.2rem rgba(15, 23, 42, 0.06);
 }
 
 html.fi {
@@ -1631,6 +1636,376 @@ body.fi-body {
     text-decoration: none;
     background: rgba(255, 255, 255, 0.86);
     border-radius: 0.25rem;
+}
+
+/* Kominfo admin shell */
+html.fi {
+    color-scheme: light;
+}
+
+body.fi-body {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96)),
+        var(--adminlte-body);
+    color: #0f172a;
+}
+
+.fi-topbar {
+    color: #0f172a;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 0.45rem 1.4rem rgba(15, 23, 42, 0.05);
+}
+
+.fi-topbar .fi-icon-btn,
+.fi-topbar .fi-icon-btn svg,
+.fi-topbar button {
+    color: #334155;
+}
+
+.fi-topbar .fi-icon-btn:hover,
+.fi-topbar button:hover {
+    color: #0284c7;
+    background: #f1f5f9;
+}
+
+.fi-sidebar {
+    background:
+        linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(15, 23, 42, 0.98)),
+        var(--adminlte-sidebar);
+    box-shadow: 0.45rem 0 1.5rem rgba(15, 23, 42, 0.16);
+}
+
+.fi-sidebar-header-ctn,
+.fi-sidebar-header {
+    background: rgba(2, 6, 23, 0.24);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.fi-sidebar-nav {
+    scrollbar-color: rgba(148, 163, 184, 0.34) transparent;
+    scrollbar-width: thin;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar {
+    width: 0.45rem;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fi-sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.28);
+    border-radius: 999px;
+}
+
+.fi-sidebar-group-btn {
+    color: var(--adminlte-sidebar-muted);
+}
+
+.fi-sidebar-group-label {
+    color: var(--adminlte-sidebar-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    opacity: 0.92;
+}
+
+.fi-sidebar-item-btn {
+    color: var(--adminlte-sidebar-text);
+}
+
+.fi-sidebar-item-icon,
+.fi-sidebar-item-btn svg {
+    color: #94a3b8;
+}
+
+.fi-sidebar-item-btn:hover {
+    color: #ffffff;
+    background: var(--adminlte-sidebar-hover);
+}
+
+.fi-sidebar-item-btn:hover .fi-sidebar-item-icon,
+.fi-sidebar-item-btn:hover svg {
+    color: #dbeafe;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+.fi-sidebar-item-has-active-child-items > .fi-sidebar-item-btn {
+    color: #ffffff;
+    background: var(--adminlte-sidebar-active);
+    box-shadow:
+        inset 0.25rem 0 0 rgba(255, 255, 255, 0.34),
+        0 0.6rem 1.3rem rgba(37, 99, 235, 0.22);
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn .fi-sidebar-item-icon,
+.fi-sidebar-item-has-active-child-items > .fi-sidebar-item-btn .fi-sidebar-item-icon,
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn svg,
+.fi-sidebar-item-has-active-child-items > .fi-sidebar-item-btn svg {
+    color: #ffffff;
+}
+
+.fi-sidebar-item-badge {
+    color: #dbeafe;
+    background: rgba(59, 130, 246, 0.22);
+    border-color: rgba(147, 197, 253, 0.18);
+}
+
+.fi-section,
+.fi-ta-ctn,
+.fi-in-repeatable-item,
+.fi-modal-window,
+.fi-wi-chart,
+.fi-wi-table,
+.fi-wi-account,
+.fi-fo-tabs,
+.fi-sc-section,
+.verification-inbox,
+.admin-map-picker {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: var(--adminlte-card-shadow);
+}
+
+.fi-header-heading,
+.fi-section-header-heading,
+.fi-ta-header-heading,
+.fi-modal-heading,
+.fi-sc-section-header-heading,
+.fi-wi-stats-overview-stat-value,
+.verification-inbox__header h3,
+.verification-inbox__card h4 {
+    color: #0f172a;
+}
+
+.fi-ta-header-cell,
+.fi-ta-cell,
+.verification-inbox__card {
+    border-color: #e5e7eb;
+}
+
+.fi-input-wrp,
+.fi-select-input,
+.fi-textarea {
+    color: #0f172a;
+    background: #ffffff;
+    border-color: #cbd5e1;
+}
+
+.fi-dropdown-panel,
+.fi-modal-window {
+    color: #0f172a;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+}
+
+.fi-dropdown-list-item:hover {
+    background: #f1f5f9;
+}
+
+.fi-btn-color-primary {
+    background: #0284c7;
+}
+
+.fi-btn-color-primary:hover {
+    background: #0369a1;
+}
+
+.fi-wi-stats-overview-stat {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    border-left-color: #0284c7;
+}
+
+.verification-inbox__eyebrow {
+    color: #075985;
+    background: #e0f2fe;
+}
+
+.verification-inbox__badges span {
+    color: #475569;
+    background: #f8fafc;
+    border-color: #e5e7eb;
+}
+
+html.dark,
+html.dark.fi {
+    color-scheme: dark;
+    background: #020617;
+}
+
+html.dark body.fi-body {
+    background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(2, 6, 23, 0.98)),
+        #020617;
+    color: #f8fafc;
+}
+
+html.dark .fi-topbar {
+    color: #f8fafc;
+    background: #0f172a;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 0.45rem 1.4rem rgba(2, 6, 23, 0.32);
+}
+
+html.dark .fi-topbar .fi-icon-btn,
+html.dark .fi-topbar .fi-icon-btn svg,
+html.dark .fi-topbar button {
+    color: #cbd5e1;
+}
+
+html.dark .fi-topbar .fi-icon-btn:hover,
+html.dark .fi-topbar button:hover {
+    color: #f8fafc;
+    background: rgba(14, 165, 233, 0.14);
+}
+
+html.dark .fi-sidebar {
+    background:
+        linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.98)),
+        #020617;
+}
+
+html.dark .fi-sidebar-header-ctn,
+html.dark .fi-sidebar-header {
+    background: rgba(2, 6, 23, 0.48);
+    border-bottom-color: rgba(148, 163, 184, 0.14);
+}
+
+html.dark .fi-sidebar-item-btn:hover {
+    background: rgba(14, 165, 233, 0.18);
+}
+
+html.dark .fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+html.dark .fi-sidebar-item-has-active-child-items > .fi-sidebar-item-btn {
+    background: #0284c7;
+    box-shadow:
+        inset 0.25rem 0 0 rgba(255, 255, 255, 0.34),
+        0 0.6rem 1.3rem rgba(2, 132, 199, 0.28);
+}
+
+html.dark .fi-page,
+html.dark .fi-main > .fi-page {
+    color: #e2e8f0;
+}
+
+html.dark .fi-section,
+html.dark .fi-ta-ctn,
+html.dark .fi-in-repeatable-item,
+html.dark .fi-modal-window,
+html.dark .fi-wi-chart,
+html.dark .fi-wi-table,
+html.dark .fi-wi-account,
+html.dark .fi-fo-tabs,
+html.dark .fi-sc-section,
+html.dark .verification-inbox,
+html.dark .admin-map-picker {
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.18);
+    box-shadow: 0 0.45rem 1.6rem rgba(2, 6, 23, 0.28);
+}
+
+html.dark .fi-section-header,
+html.dark .fi-ta-header,
+html.dark .fi-modal-header,
+html.dark .fi-fo-tabs-tab,
+html.dark .fi-sc-section-header,
+html.dark .verification-inbox__header,
+html.dark .admin-map-picker__toolbar {
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+html.dark .fi-header-heading,
+html.dark .fi-section-header-heading,
+html.dark .fi-ta-header-heading,
+html.dark .fi-modal-heading,
+html.dark .fi-sc-section-header-heading,
+html.dark .fi-wi-stats-overview-stat-value,
+html.dark .verification-inbox__header h3,
+html.dark .verification-inbox__card h4 {
+    color: #f8fafc;
+}
+
+html.dark .fi-ta-table,
+html.dark .fi-ta-text,
+html.dark .fi-wi-stats-overview-stat-description,
+html.dark .verification-inbox__card p,
+html.dark .verification-inbox__meta,
+html.dark .verification-inbox__empty {
+    color: #cbd5e1;
+}
+
+html.dark .fi-ta-header-cell,
+html.dark .fi-ta-cell,
+html.dark .verification-inbox__card {
+    border-color: rgba(148, 163, 184, 0.16);
+}
+
+html.dark .fi-input-wrp,
+html.dark .fi-select-input,
+html.dark .fi-textarea,
+html.dark .admin-map-picker__button,
+html.dark .admin-map-picker__icon-button {
+    color: #f8fafc;
+    background: #111827;
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+html.dark .fi-input,
+html.dark .fi-select-input,
+html.dark .fi-textarea {
+    color: #f8fafc;
+}
+
+html.dark .fi-input::placeholder,
+html.dark .fi-textarea::placeholder {
+    color: #94a3b8;
+}
+
+html.dark .fi-dropdown-panel,
+html.dark .fi-modal-window {
+    color: #f8fafc;
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+html.dark .fi-dropdown-list-item:hover {
+    background: rgba(14, 165, 233, 0.14);
+}
+
+html.dark .fi-wi-stats-overview-stat {
+    background: #0f172a;
+    border-color: rgba(148, 163, 184, 0.18);
+    border-left-color: #0284c7;
+}
+
+html.dark .fi-wi-stats-overview-stat::after {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(37, 99, 235, 0.08));
+}
+
+html.dark .fi-wi-stats-overview-stat-label,
+html.dark .fi-wi-stats-overview-stat-label-ctn {
+    color: #94a3b8;
+}
+
+html.dark .verification-inbox__eyebrow {
+    color: #bae6fd;
+    background: rgba(14, 165, 233, 0.16);
+}
+
+html.dark .verification-inbox__badges span {
+    color: #cbd5e1;
+    background: #111827;
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+html.dark .verification-inbox__type {
+    background: #0284c7;
+}
+
+html.dark .fi-badge {
+    border-color: rgba(148, 163, 184, 0.2);
 }
 
 @media (min-width: 1024px) {

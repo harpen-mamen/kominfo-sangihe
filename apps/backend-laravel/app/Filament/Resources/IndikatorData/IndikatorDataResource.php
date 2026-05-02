@@ -14,6 +14,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -87,8 +88,15 @@ class IndikatorDataResource extends Resource
                     TextInput::make('kode')->required()->unique(ignoreRecord: true)->maxLength(80),
                     TextInput::make('nama')->required()->maxLength(180),
                     Select::make('kelompok')->options(ResourceOptions::kelompokIndikator())->required(),
+                    Select::make('kategori')
+                        ->label('Kategori/Kelompok Publik')
+                        ->options(ResourceOptions::kelompokIndikator())
+                        ->searchable()
+                        ->required(),
                     TextInput::make('satuan')->required()->maxLength(30),
+                    Select::make('tipe_nilai')->options(ResourceOptions::tipeNilai())->default('decimal')->required(),
                     Select::make('level_input')->options(ResourceOptions::levelInput())->default('desa')->required(),
+                    Select::make('metode_agregasi')->options(ResourceOptions::metodeAgregasi())->default('sum')->required(),
                     Select::make('opd_id')
                         ->label('OPD Pemilik')
                         ->relationship('opd', 'nama')
@@ -98,14 +106,32 @@ class IndikatorDataResource extends Resource
                         ->searchable()
                         ->preload()
                         ->visible(fn (): bool => FilamentWorkspace::isKominfo() || FilamentWorkspace::isDepartment()),
+                    Select::make('opd_pembina_id')
+                        ->label('OPD Pembina')
+                        ->relationship('opdPembina', 'nama')
+                        ->searchable()
+                        ->preload()
+                        ->visible(fn (): bool => FilamentWorkspace::isKominfo() || FilamentWorkspace::isDepartment()),
+                    Toggle::make('wajib_diisi')
+                        ->label('Wajib Diisi')
+                        ->default(true),
                     Toggle::make('boleh_diinput_opd')
                         ->label('Boleh Diinput OPD')
                         ->default(true),
                     Toggle::make('boleh_diinput_kecamatan')
                         ->label('Boleh Diinput Kecamatan')
                         ->default(false),
+                    Toggle::make('boleh_publikasi')
+                        ->label('Boleh Tampil di Portal Publik')
+                        ->default(true),
                     TextInput::make('urutan')->numeric()->default(0),
+                    TextInput::make('urutan_tampil')->numeric()->default(0),
+                    TextInput::make('batas_min')->numeric()->label('Batas Minimum'),
+                    TextInput::make('batas_max')->numeric()->label('Batas Maksimum'),
                     Toggle::make('aktif')->default(true),
+                    Textarea::make('petunjuk_pengisian')
+                        ->rows(3)
+                        ->columnSpanFull(),
                 ])
                 ->columns(3),
         ]);
@@ -127,11 +153,15 @@ class IndikatorDataResource extends Resource
                 TextColumn::make('kode')->searchable()->sortable(),
                 TextColumn::make('nama')->searchable()->sortable(),
                 TextColumn::make('opd.nama')->label('OPD')->placeholder('Umum')->searchable()->sortable(),
-                TextColumn::make('kelompok')->badge()->sortable(),
+                TextColumn::make('kategori')->badge()->sortable()->placeholder(fn (IndikatorData $record): ?string => $record->kelompok),
                 TextColumn::make('satuan')->badge(),
+                TextColumn::make('tipe_nilai')->badge(),
                 TextColumn::make('level_input')->badge(),
+                TextColumn::make('metode_agregasi')->badge(),
+                IconColumn::make('wajib_diisi')->label('Wajib')->boolean(),
                 IconColumn::make('boleh_diinput_opd')->label('Input OPD')->boolean(),
                 IconColumn::make('boleh_diinput_kecamatan')->label('Input Kecamatan')->boolean(),
+                IconColumn::make('boleh_publikasi')->label('Publik')->boolean(),
                 IconColumn::make('aktif')->boolean(),
             ])
             ->filters([
@@ -169,6 +199,9 @@ class IndikatorDataResource extends Resource
         if (FilamentWorkspace::isDepartment() && auth()->user()?->opd_id) {
             $data['opd_id'] = auth()->user()->opd_id;
         }
+
+        $data['kategori'] = $data['kategori'] ?? $data['kelompok'] ?? null;
+        $data['urutan_tampil'] = $data['urutan_tampil'] ?? $data['urutan'] ?? 0;
 
         return $data;
     }

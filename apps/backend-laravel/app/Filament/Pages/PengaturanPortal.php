@@ -9,7 +9,6 @@ use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\WithFileUploads;
 
@@ -49,6 +48,11 @@ class PengaturanPortal extends Page
     public ?string $heroBackgroundImagePath = null;
 
     public mixed $heroBackgroundImageUpload = null;
+
+    /** @var array<int, string> */
+    public array $heroBackgroundImagePaths = [];
+
+    public mixed $heroBackgroundImageUploads = null;
 
     public ?string $heroBackgroundVideoPath = null;
 
@@ -125,6 +129,10 @@ class PengaturanPortal extends Page
 
         $this->heroBackgroundType = $settings->get('hero_background_type', $defaults['hero_background_type'] ?? 'image') ?? 'image';
         $this->heroBackgroundImagePath = $settings->get('hero_background_image');
+        $this->heroBackgroundImagePaths = $this->decodePathList($settings->get('hero_background_images'));
+        if ($this->heroBackgroundImagePath && ! in_array($this->heroBackgroundImagePath, $this->heroBackgroundImagePaths, true)) {
+            array_unshift($this->heroBackgroundImagePaths, $this->heroBackgroundImagePath);
+        }
         $this->heroBackgroundVideoPath = $settings->get('hero_background_video');
         $this->heroVideoPosterPath = $settings->get('hero_video_poster');
         $this->heroTitle = $settings->get('hero_title', $defaults['hero_title'] ?? null);
@@ -193,6 +201,8 @@ class PengaturanPortal extends Page
 
             'portalLogoUpload' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'heroBackgroundImageUpload' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'heroBackgroundImageUploads' => ['nullable', 'array'],
+            'heroBackgroundImageUploads.*' => ['file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'heroBackgroundVideoUpload' => ['nullable', 'file', 'mimes:mp4,webm', 'max:30720'],
             'heroVideoPosterUpload' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
 
@@ -231,6 +241,21 @@ class PengaturanPortal extends Page
             $path = $this->heroBackgroundImageUpload->store($directory, $disk);
             $settings->set('hero_background_image', $path, 'file');
             $this->heroBackgroundImagePath = $path;
+            array_unshift($this->heroBackgroundImagePaths, $path);
+        }
+
+        if (is_array($this->heroBackgroundImageUploads)) {
+            foreach ($this->heroBackgroundImageUploads as $upload) {
+                $path = $upload->store($directory, $disk);
+                $this->heroBackgroundImagePaths[] = $path;
+            }
+        }
+
+        $this->heroBackgroundImagePaths = array_values(array_unique(array_filter($this->heroBackgroundImagePaths)));
+        if ($this->heroBackgroundImagePaths !== []) {
+            $settings->set('hero_background_images', json_encode($this->heroBackgroundImagePaths), 'json');
+            $settings->set('hero_background_image', $this->heroBackgroundImagePaths[0], 'file');
+            $this->heroBackgroundImagePath = $this->heroBackgroundImagePaths[0];
         }
 
         if ($this->heroBackgroundVideoUpload) {
@@ -291,6 +316,7 @@ class PengaturanPortal extends Page
         $this->reset(
             'portalLogoUpload',
             'heroBackgroundImageUpload',
+            'heroBackgroundImageUploads',
             'heroBackgroundVideoUpload',
             'heroVideoPosterUpload',
             'aboutRegionImageUpload',
@@ -304,26 +330,66 @@ class PengaturanPortal extends Page
 
     public function getPortalLogoUrlProperty(): ?string
     {
-        return $this->portalLogoPath ? Storage::disk('public')->url($this->portalLogoPath) : null;
+        return $this->publicStorageUrl($this->portalLogoPath);
     }
 
     public function getHeroBackgroundImageUrlProperty(): ?string
     {
-        return $this->heroBackgroundImagePath ? Storage::disk('public')->url($this->heroBackgroundImagePath) : null;
+        return $this->publicStorageUrl($this->heroBackgroundImagePath);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getHeroBackgroundImageUrlsProperty(): array
+    {
+        return collect($this->heroBackgroundImagePaths)
+            ->filter()
+            ->map(fn (string $path): ?string => $this->publicStorageUrl($path))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function getHeroBackgroundVideoUrlProperty(): ?string
     {
-        return $this->heroBackgroundVideoPath ? Storage::disk('public')->url($this->heroBackgroundVideoPath) : null;
+        return $this->publicStorageUrl($this->heroBackgroundVideoPath);
     }
 
     public function getHeroVideoPosterUrlProperty(): ?string
     {
-        return $this->heroVideoPosterPath ? Storage::disk('public')->url($this->heroVideoPosterPath) : null;
+        return $this->publicStorageUrl($this->heroVideoPosterPath);
     }
 
     public function getAboutRegionImageUrlProperty(): ?string
     {
-        return $this->aboutRegionImagePath ? Storage::disk('public')->url($this->aboutRegionImagePath) : null;
+        return $this->publicStorageUrl($this->aboutRegionImagePath);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function decodePathList(?string $value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_filter($decoded, fn ($path): bool => is_string($path) && $path !== ''));
+    }
+
+    private function publicStorageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        return url('storage-files/' . ltrim($path, '/'));
     }
 }

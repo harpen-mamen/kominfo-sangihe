@@ -322,6 +322,11 @@ class PublicPortalController extends Controller
 
         $backgroundType = $this->portalSettings->get('hero_background_type', $defaults['hero_background_type'] ?? 'image') ?? 'image';
         $storedHeroImage = $this->portalSettings->publicUrl($this->portalSettings->get('hero_background_image'));
+        $storedHeroImages = collect($this->decodePathList($this->portalSettings->get('hero_background_images')))
+            ->map(fn (string $path): ?string => $this->portalSettings->publicUrl($path))
+            ->filter()
+            ->values()
+            ->all();
         $storedHeroVideo = $this->portalSettings->publicUrl($this->portalSettings->get('hero_background_video'));
         $storedVideoPoster = $this->portalSettings->publicUrl($this->portalSettings->get('hero_video_poster'));
 
@@ -330,6 +335,7 @@ class PublicPortalController extends Controller
 
         $backgroundImageUrl = $storedHeroImage ?: $fallbackImage;
         $backgroundImageUrls = array_values(array_unique(array_filter(array_merge(
+            $storedHeroImages,
             [$backgroundImageUrl],
             $fallbackImages,
         ))));
@@ -397,6 +403,24 @@ class PublicPortalController extends Controller
                 'phone' => $this->portalSettings->get('contact_phone', $defaults['contact_phone'] ?? null),
             ],
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function decodePathList(?string $value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_filter($decoded, fn ($path): bool => is_string($path) && $path !== ''));
     }
 
     /**

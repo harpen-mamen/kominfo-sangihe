@@ -1,29 +1,64 @@
+{{-- resources/views/filament/pages/statistik-daerah/partials/statistic-ranking-list.blade.php --}}
+
 @php
-    $rows = collect($rows ?? [])->values();
-    $max = max(1, (float) ($rows->max('value') ?? 1));
+    $title = $title ?? 'Ranking Wilayah';
+    $description = $description ?? 'Wilayah dengan nilai tertinggi.';
+    $items = collect($items ?? []);
+    $badge = $badge ?? 'Top Ranking';
+    $maxValue = max((float) $items->max(fn ($item) => (float) data_get($item, 'nilai', 0)), 1);
 @endphp
 
-<section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-    <div class="mb-4">
-        <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ $title ?? 'Ranking Wilayah' }}</h2>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $description ?? 'Daftar ranking berdasarkan filter aktif.' }}</p>
+<div class="kom-card">
+    <div class="kom-card-header">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <span class="kom-badge" style="height: 32px; width: 32px; justify-content: center; padding: 0;">
+                <x-filament::icon icon="heroicon-o-trophy" style="width: 18px; height: 18px;" />
+            </span>
+
+            <div>
+                <h3 class="kom-card-title">{{ $title }}</h3>
+                <p class="kom-card-desc">{{ $description }}</p>
+            </div>
+        </div>
+
+        <span class="kom-badge">{{ $badge }}</span>
     </div>
-    <div class="space-y-3">
-        @forelse ($rows as $index => $row)
-            @php $width = max(4, min(100, ((float) $row['value'] / $max) * 100)); @endphp
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
-                <div class="mb-2 flex items-center justify-between gap-3">
-                    <span class="min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{{ $index + 1 }}. {{ $row['label'] }}</span>
-                    <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold tabular-nums text-gray-700 shadow-sm dark:bg-gray-900 dark:text-gray-200">{{ $this->formatNumber($row['value']) }}</span>
+
+    <div class="kom-card-body">
+        @forelse ($items as $index => $item)
+            @php
+                $nilai = (float) data_get($item, 'nilai', 0);
+                $percent = min(100, max(4, ($nilai / $maxValue) * 100));
+            @endphp
+
+            <div style="padding: 13px 0; border-bottom: 1px solid var(--kom-border);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                        <span class="kom-badge" style="min-width: 34px; justify-content: center;">
+                            {{ $index + 1 }}
+                        </span>
+
+                        <span class="kom-text-strong" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ data_get($item, 'nama', '-') }}
+                        </span>
+                    </div>
+
+                    <span class="kom-text-strong" style="white-space: nowrap;">
+                        {{ number_format($nilai, 2, ',', '.') }}
+                    </span>
                 </div>
-                <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
-                    <div class="h-full rounded-full bg-gradient-to-r from-[#0f3b57] via-[#0ea5a8] to-[#22c55e]" style="width: {{ $width }}%"></div>
+
+                <div style="height: 8px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--kom-card-soft);">
+                    <div style="width: {{ $percent }}%; height: 100%; border-radius: 999px; background: var(--kom-primary);"></div>
                 </div>
             </div>
         @empty
-            <div class="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500 dark:border-gray-700">
-                Belum ada ranking untuk filter ini.
+            <div class="kom-empty">
+                <p class="kom-empty-title">Belum ada data ranking.</p>
+                <p class="kom-empty-text">
+                    Ranking akan tampil setelah data tersedia.
+                </p>
             </div>
         @endforelse
     </div>
-</section>
+</div>

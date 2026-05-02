@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\NilaiDataMentah\Pages;
 
 use App\Filament\Resources\NilaiDataMentah\NilaiDataMentahResource;
+use App\Support\FilamentWorkspace;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
@@ -12,6 +13,9 @@ class ManageNilaiDataMentah extends ManageRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()];
+        return [
+            CreateAction::make()
+                ->visible(fn (): bool => ! FilamentWorkspace::isKominfo()),
+        ];
     }
 }

@@ -28,6 +28,37 @@ class NilaiDataMentahObserver
             ]);
         }
 
+        if ($nilai->pengajuanData && ! $nilai->pengajuanData->canInputValues()) {
+            throw ValidationException::withMessages([
+                'pengajuan_data_id' => 'Nilai hanya dapat diedit saat pengajuan berstatus draft atau revisi.',
+            ]);
+        }
+
+        $nilai->tipe_sumber ??= $nilai->desa_id ? 'desa' : 'kecamatan';
+        $nilai->sumber_id ??= $nilai->desa_id ?: $nilai->pengajuanData?->kecamatan_id;
+        $nilai->nilai_decimal = $nilai->normalisasiNilaiDecimal();
+        $nilai->nilai = $nilai->nilai_decimal ?? 0;
+
+        if ($nilai->is_tidak_tersedia && blank($nilai->catatan)) {
+            throw ValidationException::withMessages([
+                'catatan' => 'Catatan wajib diisi jika nilai ditandai tidak tersedia.',
+            ]);
+        }
+
+        if (! $nilai->is_tidak_tersedia && $nilai->nilai_decimal !== null && $nilai->indikatorData) {
+            if ($nilai->indikatorData->batas_min !== null && (float) $nilai->nilai_decimal < (float) $nilai->indikatorData->batas_min) {
+                throw ValidationException::withMessages([
+                    'nilai_decimal' => 'Nilai berada di bawah batas minimum indikator.',
+                ]);
+            }
+
+            if ($nilai->indikatorData->batas_max !== null && (float) $nilai->nilai_decimal > (float) $nilai->indikatorData->batas_max) {
+                throw ValidationException::withMessages([
+                    'nilai_decimal' => 'Nilai berada di atas batas maksimum indikator.',
+                ]);
+            }
+        }
+
         if ($nilai->desa && $nilai->pengajuanData?->kecamatan_id && $nilai->desa->kecamatan_id !== $nilai->pengajuanData->kecamatan_id) {
             throw ValidationException::withMessages([
                 'desa_id' => 'Desa harus berada dalam kecamatan pengajuan.',
@@ -48,19 +79,15 @@ class NilaiDataMentahObserver
 
         $duplicate = NilaiDataMentah::query()
             ->where('pengajuan_data_id', $nilai->pengajuan_data_id)
-            ->where('desa_id', $nilai->desa_id)
             ->where('indikator_data_id', $nilai->indikator_data_id)
-            ->when(
-                $nilai->sumber_data_id,
-                fn ($query) => $query->where('sumber_data_id', $nilai->sumber_data_id),
-                fn ($query) => $query->whereNull('sumber_data_id'),
-            )
+            ->where('tipe_sumber', $nilai->tipe_sumber)
+            ->where('sumber_id', $nilai->sumber_id)
             ->when($nilai->exists, fn ($query) => $query->whereKeyNot($nilai->getKey()))
             ->exists();
 
         if ($duplicate) {
             throw ValidationException::withMessages([
-                'indikator_data_id' => 'Nilai untuk desa, indikator, dan sumber data tersebut sudah ada.',
+                'indikator_data_id' => 'Nilai untuk pengajuan, indikator, dan sumber tersebut sudah ada.',
             ]);
         }
 

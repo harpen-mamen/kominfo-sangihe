@@ -33,6 +33,17 @@ class NilaiDataMentah extends ModelIndonesia
                 ]);
             }
 
+            if (! $nilai->pengajuanData->canInputValues()) {
+                throw ValidationException::withMessages([
+                    'pengajuan_data_id' => 'Nilai hanya dapat diedit saat pengajuan berstatus draft atau revisi.',
+                ]);
+            }
+
+            $nilai->tipe_sumber ??= $nilai->desa_id ? 'desa' : 'kecamatan';
+            $nilai->sumber_id ??= $nilai->desa_id ?: $nilai->pengajuanData->kecamatan_id;
+            $nilai->nilai_decimal = $nilai->normalisasiNilaiDecimal();
+            $nilai->nilai = $nilai->nilai_decimal ?? 0;
+
             if ($nilai->desa && $nilai->pengajuanData->kecamatan_id && $nilai->desa->kecamatan_id !== $nilai->pengajuanData->kecamatan_id) {
                 throw ValidationException::withMessages([
                     'desa_id' => 'Desa harus berada pada kecamatan pengajuan yang sama.',
@@ -91,7 +102,33 @@ class NilaiDataMentah extends ModelIndonesia
     {
         return [
             'nilai' => 'decimal:2',
+            'nilai_decimal' => 'decimal:4',
+            'is_tidak_tersedia' => 'boolean',
         ];
+    }
+
+    public function normalisasiNilaiDecimal(): ?string
+    {
+        if ($this->is_tidak_tersedia) {
+            return null;
+        }
+
+        if ($this->nilai_decimal !== null && $this->nilai_decimal !== '') {
+            return (string) $this->nilai_decimal;
+        }
+
+        if ($this->nilai !== null && $this->nilai !== '') {
+            return (string) $this->nilai;
+        }
+
+        return null;
+    }
+
+    public function hasUsableValue(): bool
+    {
+        return (bool) $this->is_tidak_tersedia
+            || $this->nilai_decimal !== null
+            || filled($this->nilai_text);
     }
 
     public function pengajuanData(): BelongsTo

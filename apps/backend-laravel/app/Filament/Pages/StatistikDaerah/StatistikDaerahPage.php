@@ -54,7 +54,7 @@ abstract class StatistikDaerahPage extends Page
     {
         $periode = PeriodeData::query()->orderByDesc('tahun')->orderByDesc('bulan')->first();
 
-        $this->periodeDataId = $periode?->id;
+        $this->periodeDataId = null;
         $this->tahun = $periode?->tahun ? (int) $periode->tahun : now()->year;
         $this->bulan = $periode?->bulan ? (int) $periode->bulan : now()->month;
     }
@@ -67,6 +67,21 @@ abstract class StatistikDaerahPage extends Page
     public function updatedKecamatanId(): void
     {
         $this->desaId = null;
+    }
+
+    public function updatedModePeriode(): void
+    {
+        $this->periodeDataId = null;
+    }
+
+    public function updatedTahun(): void
+    {
+        $this->periodeDataId = null;
+    }
+
+    public function updatedBulan(): void
+    {
+        $this->periodeDataId = null;
     }
 
     public function updatedOpdId(): void
@@ -302,6 +317,53 @@ abstract class StatistikDaerahPage extends Page
                 'sumber_data' => $row->sumber_data ?: '-',
                 'nilai' => (float) $row->nilai,
                 'satuan' => $row->satuan,
+            ])
+            ->all();
+    }
+
+    public function getRowsProperty(): array
+    {
+        return $this->detailRows;
+    }
+
+    public function getTotalsProperty(): array
+    {
+        $stats = $this->scopedValues()
+            ->selectRaw('
+                COALESCE(SUM(nilai_data_mentah.nilai), 0) as nilai,
+                COUNT(DISTINCT nilai_data_mentah.indikator_data_id) as indikator,
+                COUNT(DISTINCT indikator_data.opd_id) as opd,
+                COUNT(DISTINCT nilai_data_mentah.desa_id) as desa
+            ')
+            ->first();
+
+        return [
+            'nilai' => (float) ($stats->nilai ?? 0),
+            'indikator' => (int) ($stats->indikator ?? 0),
+            'opd' => (int) ($stats->opd ?? 0),
+            'desa' => (int) ($stats->desa ?? 0),
+        ];
+    }
+
+    public function getKpiCardsProperty(): array
+    {
+        return collect($this->summaryCards)
+            ->map(fn (array $card): array => [
+                'label' => $card['label'] ?? '',
+                'value' => $card['value'] ?? '0',
+                'note' => $card['note'] ?? $card['caption'] ?? '',
+                'tone' => $card['tone'] ?? 'blue',
+                'icon' => $card['icon'] ?? null,
+            ])
+            ->all();
+    }
+
+    public function getRankingWilayahProperty(): array
+    {
+        return collect($this->groupedTotals($this->desaId ? 'desa_nama' : 'kecamatan_nama', 10))
+            ->map(fn (array $row): array => [
+                'nama' => $row['label'] ?? '-',
+                'nilai' => (float) ($row['value'] ?? 0),
             ])
             ->all();
     }

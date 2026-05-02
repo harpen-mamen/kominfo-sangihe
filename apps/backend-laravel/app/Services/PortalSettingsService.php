@@ -54,7 +54,9 @@ class PortalSettingsService
             return null;
         }
 
-        return Storage::disk('public')->url($path);
+        $path = ltrim((string) $path, '/');
+
+        return url('storage-files/' . $path);
     }
 
     /**

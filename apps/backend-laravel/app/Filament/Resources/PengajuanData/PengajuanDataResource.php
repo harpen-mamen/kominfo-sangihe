@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\PengajuanData;
 
+use App\Filament\Resources\PengajuanData\Pages\InputDataPengajuan;
 use App\Filament\Resources\PengajuanData\Pages\ManagePengajuanData;
+use App\Filament\Resources\PengajuanData\Pages\ViewPengajuanData;
 use App\Models\Desa;
 use App\Models\IndikatorData;
 use App\Models\PengajuanData;
@@ -21,10 +23,8 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -34,8 +34,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Throwable;
+use Illuminate\Support\Facades\Schema as DbSchema;
 
 class PengajuanDataResource extends Resource
 {
@@ -51,6 +52,31 @@ class PengajuanDataResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'id';
 
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::navigationAttentionCount();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return static::navigationAttentionCount() > 0 ? 'warning' : null;
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        if (FilamentWorkspace::isKominfo()) {
+            return 'Pengajuan menunggu peninjauan';
+        }
+
+        if (FilamentWorkspace::isSubdistrict() || FilamentWorkspace::isDepartment()) {
+            return 'Pengajuan perlu revisi';
+        }
+
+        return null;
+    }
+
     public static function canViewAny(): bool
     {
         return FilamentWorkspace::canAccessWorkflow();
@@ -59,6 +85,18 @@ class PengajuanDataResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         return FilamentWorkspace::canAccessWorkflow();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return $record instanceof PengajuanData
+            && $record->canInputValues()
+            && static::canInputForRecord($record);
+    }
+
+    public static function canCreate(): bool
+    {
+        return FilamentWorkspace::isSubdistrict() || FilamentWorkspace::isDepartment();
     }
 
     public static function form(Schema $schema): Schema
@@ -75,6 +113,7 @@ class PengajuanDataResource extends Resource
                         ->searchable()
                         ->preload()
                         ->required(fn (): bool => ! FilamentWorkspace::isDepartment()),
+
                     Select::make('opd_id')
                         ->relationship('opd', 'nama')
                         ->default(fn () => auth()->user()?->opd_id)
@@ -84,9 +123,14 @@ class PengajuanDataResource extends Resource
                         ->preload()
                         ->visible(fn (): bool => FilamentWorkspace::isDepartment() || FilamentWorkspace::isKominfo())
                         ->required(fn (): bool => FilamentWorkspace::isDepartment()),
+
                     Select::make('periode_data_id')
                         ->options(fn (): array => PeriodeData::query()
-                            ->where('terkunci', false)
+                            ->where(function (Builder $query): void {
+                                $query
+                                    ->where('terkunci', false)
+                                    ->orWhereNull('terkunci');
+                            })
                             ->orderByDesc('tahun')
                             ->orderByDesc('bulan')
                             ->pluck('label', 'id')
@@ -94,48 +138,25 @@ class PengajuanDataResource extends Resource
                         ->searchable()
                         ->preload()
                         ->required(),
-                    Hidden::make('dikirim_oleh')->default(fn () => auth()->id()),
-                    Select::make('status')
-                        ->options(fn (): array => FilamentWorkspace::isSubdistrict() || FilamentWorkspace::isDepartment()
-                            ? [
-                                'draft' => ResourceOptions::statusData()['draft'],
-                                'diajukan' => ResourceOptions::statusData()['diajukan'],
-                            ]
-                            : ResourceOptions::statusData())
+
+                    Hidden::make('dikirim_oleh')
+                        ->default(fn () => auth()->id()),
+
+                    Hidden::make('status')
                         ->default('draft')
-                        ->dehydrateStateUsing(fn (?string $state): string => $state ?: 'draft')
-                        ->required(),
-                    Textarea::make('catatan')->rows(3)->columnSpanFull(),
+                        ->dehydrateStateUsing(fn (?string $state): string => $state ?: 'draft'),
+
+                    Select::make('kelompok_indikator')
+                        ->label('Filter Kelompok Indikator')
+                        ->options(ResourceOptions::kelompokIndikator())
+                        ->searchable()
+                        ->helperText('Kosongkan untuk memakai seluruh indikator aktif yang dibuka untuk kecamatan.'),
+
+                    Textarea::make('catatan')
+                        ->rows(3)
+                        ->columnSpanFull(),
                 ])
                 ->columns(2),
-            Section::make('Nilai Data Mentah')
-                ->schema([
-                    Repeater::make('nilaiDataMentah')
-                        ->relationship('nilaiDataMentah')
-                        ->schema([
-                            Select::make('desa_id')
-                                ->label('Desa')
-                                ->options(fn (): array => static::desaOptions())
-                                ->searchable()
-                                ->preload()
-                                ->required(),
-                            Select::make('indikator_data_id')
-                                ->label('Indikator')
-                                ->options(fn (): array => static::indikatorOptions())
-                                ->searchable()
-                                ->preload()
-                                ->required(),
-                            Select::make('sumber_data_id')
-                                ->label('Sumber Data')
-                                ->options(fn (): array => static::sumberDataOptions())
-                                ->searchable()
-                                ->preload(),
-                            TextInput::make('nilai')->numeric()->required()->minValue(0),
-                            Textarea::make('catatan')->rows(2)->columnSpanFull(),
-                        ])
-                        ->columns(2)
-                        ->columnSpanFull(),
-                ]),
         ]);
     }
 
@@ -153,75 +174,256 @@ class PengajuanDataResource extends Resource
                     }
                 }
 
-                return $query->with(['kecamatan', 'opd', 'periodeData', 'dikirimOleh', 'diverifikasiOleh']);
+                $query->with([
+                    'kecamatan',
+                    'opd',
+                    'periodeData',
+                    'dikirimOleh',
+                    'diverifikasiOleh',
+                ]);
+
+                if (DbSchema::hasTable('nilai_data_mentah')) {
+                    $query->withCount('nilaiDataMentah');
+                }
+
+                return $query;
             })
             ->columns([
-                TextColumn::make('id')->label('#')->sortable(),
-                TextColumn::make('kecamatan.nama')->label('Kecamatan')->searchable()->sortable(),
-                TextColumn::make('opd.nama')->label('OPD')->placeholder('-')->searchable()->sortable(),
-                TextColumn::make('periodeData.label')->label('Periode')->sortable(),
-                TextColumn::make('status')->badge(),
-                TextColumn::make('dikirimOleh.nama')->label('Dikirim oleh'),
-                TextColumn::make('tanggal_kirim')->dateTime('d M Y H:i')->toggleable(),
-                TextColumn::make('tanggal_terbit')->dateTime('d M Y H:i')->toggleable(),
+                TextColumn::make('id')
+                    ->label('#')
+                    ->sortable(),
+
+                TextColumn::make('kecamatan.nama')
+                    ->label('Kecamatan')
+                    ->placeholder('-')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('opd.nama')
+                    ->label('OPD')
+                    ->placeholder('-')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('periodeData.label')
+                    ->label('Periode')
+                    ->sortable(),
+
+                TextColumn::make('kelompok_indikator')
+                    ->label('Kelompok')
+                    ->placeholder('-')
+                    ->toggleable(),
+
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => ResourceOptions::statusData()[$state] ?? (string) $state)
+                    ->color(fn (?string $state): string => match ($state) {
+                        'draft' => 'gray',
+                        'diajukan' => 'warning',
+                        'revisi' => 'warning',
+                        'terverifikasi' => 'success',
+                        'ditolak' => 'danger',
+                        'terbit' => 'primary',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('dikirimOleh.nama')
+                    ->label('Dikirim oleh')
+                    ->placeholder('-'),
+
+                TextColumn::make('nilai_data_mentah_count')
+                    ->label('Data Masuk')
+                    ->numeric()
+                    ->placeholder('0')
+                    ->toggleable(),
+
+                TextColumn::make('tanggal_kirim')
+                    ->dateTime('d M Y H:i')
+                    ->toggleable(),
+
+                TextColumn::make('tanggal_terbit')
+                    ->dateTime('d M Y H:i')
+                    ->toggleable(),
             ])
             ->filters([
-                SelectFilter::make('status')->options(ResourceOptions::statusData()),
-                SelectFilter::make('kecamatan')->relationship('kecamatan', 'nama')->searchable()->preload(),
-                SelectFilter::make('opd')->relationship('opd', 'nama')->searchable()->preload(),
-                SelectFilter::make('periodeData')->relationship('periodeData', 'label')->searchable()->preload(),
+                SelectFilter::make('status')
+                    ->options(ResourceOptions::statusData()),
+
+                SelectFilter::make('kecamatan')
+                    ->relationship('kecamatan', 'nama')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('opd')
+                    ->relationship('opd', 'nama')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('periodeData')
+                    ->relationship('periodeData', 'label')
+                    ->searchable()
+                    ->preload(),
             ])
             ->recordActions([
-                Action::make('workflow')
-                    ->label('Ubah Status')
-                    ->color('warning')
-                    ->schema([
-                        Select::make('next_status')
-                            ->label('Status berikutnya')
-                            ->options(fn (PengajuanData $record): array => static::transitionOptions($record))
-                            ->required(),
-                        Textarea::make('catatan')->rows(3),
-                    ])
-                    ->action(function (PengajuanData $record, array $data): void {
-                        try {
-                            app(WorkflowService::class)->transition($record, $data['next_status'], auth()->user(), $data['catatan'] ?? null);
-                            Notification::make()->title('Status pengajuan diperbarui.')->success()->send();
-                        } catch (Throwable $exception) {
-                            Notification::make()->title('Gagal memperbarui status.')->body($exception->getMessage())->danger()->send();
-                        }
-                    })
-                    ->visible(fn (PengajuanData $record): bool => filled(static::transitionOptions($record))),
-                ViewAction::make(),
+                Action::make('input_data')
+                    ->label('Isi Data')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('info')
+                    ->url(fn (PengajuanData $record): string => static::getUrl('input', ['record' => $record]))
+                    ->visible(fn (PengajuanData $record): bool => $record->canInputValues() && static::canInputForRecord($record)),
+
+                static::workflowAction('ajukan', 'Ajukan', 'success')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->requiresConfirmation()
+                    ->visible(fn (PengajuanData $record): bool => static::canInputForRecord($record)
+                        && in_array($record->status, ['draft', 'revisi'], true)),
+
+                static::workflowAction('minta_revisi', 'Minta Revisi', 'warning', true)
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->visible(fn (PengajuanData $record): bool => static::canKominfoVerify()
+                        && in_array($record->status, ['diajukan', 'terverifikasi'], true)),
+
+                static::workflowAction('verifikasi', 'Verifikasi', 'success')
+                    ->icon('heroicon-o-check-circle')
+                    ->requiresConfirmation()
+                    ->visible(fn (PengajuanData $record): bool => static::canKominfoVerify()
+                        && in_array($record->status, ['diajukan', 'revisi'], true)),
+
+                static::workflowAction('tolak', 'Tolak', 'danger', true)
+                    ->icon('heroicon-o-x-circle')
+                    ->visible(fn (PengajuanData $record): bool => static::canKominfoVerify()
+                        && in_array($record->status, ['diajukan', 'revisi'], true)),
+
+                static::workflowAction('terbitkan', 'Terbitkan', 'primary')
+                    ->icon('heroicon-o-globe-alt')
+                    ->requiresConfirmation()
+                    ->visible(fn (PengajuanData $record): bool => static::canKominfoPublish()
+                        && $record->status === 'terverifikasi'),
+
+                static::workflowAction('tarik_publikasi', 'Tarik Publikasi', 'gray', true)
+                    ->icon('heroicon-o-archive-box-x-mark')
+                    ->visible(fn (PengajuanData $record): bool => static::canKominfoPublish()
+                        && $record->status === 'terbit'),
+
+                ViewAction::make()
+                    ->label('Lihat'),
+
                 EditAction::make()
-                    ->mutateDataUsing(fn (array $data): array => static::mutatePengajuanData($data)),
-                DeleteAction::make(),
+                    ->mutateDataUsing(fn (array $data): array => static::mutatePengajuanData($data))
+                    ->visible(fn (PengajuanData $record): bool => static::canEdit($record)),
+
+                DeleteAction::make()
+                    ->visible(fn (PengajuanData $record): bool => ! FilamentWorkspace::isKominfo()
+                        && in_array($record->status, ['draft', 'ditolak'], true)),
             ])
-            ->toolbarActions([BulkActionGroup::make([DeleteBulkAction::make()])]);
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(fn (): bool => ! FilamentWorkspace::isKominfo()),
+                ]),
+            ]);
     }
 
     public static function getPages(): array
     {
-        return ['index' => ManagePengajuanData::route('/')];
+        return [
+            'index' => ManagePengajuanData::route('/'),
+            'view' => ViewPengajuanData::route('/{record}'),
+            'input' => InputDataPengajuan::route('/{record}/input'),
+        ];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    protected static function transitionOptions(PengajuanData $record): array
+    public static function workflowAction(string $name, string $label, string $color, bool $needsNote = false): Action
     {
-        $allowed = app(WorkflowService::class)->transitions()[$record->status] ?? [];
+        return Action::make($name)
+            ->label($label)
+            ->color($color)
+            ->schema($needsNote ? [
+                Textarea::make('catatan')
+                    ->label('Catatan')
+                    ->required()
+                    ->rows(3),
+            ] : [])
+            ->action(function (PengajuanData $record, array $data) use ($name): void {
+                try {
+                    $service = app(WorkflowService::class);
+                    $catatan = $data['catatan'] ?? null;
+
+                    match ($name) {
+                        'ajukan' => $service->ajukan((int) $record->id),
+                        'minta_revisi' => $service->mintaRevisi((int) $record->id, (string) $catatan),
+                        'verifikasi' => $service->verifikasi((int) $record->id, $catatan),
+                        'tolak' => $service->tolak((int) $record->id, (string) $catatan),
+                        'terbitkan' => $service->terbitkan((int) $record->id),
+                        'tarik_publikasi' => $service->tarikPublikasi((int) $record->id, $catatan),
+                        default => null,
+                    };
+
+                    Notification::make()
+                        ->title('Status pengajuan diperbarui.')
+                        ->success()
+                        ->send();
+                } catch (\Throwable $exception) {
+                    Notification::make()
+                        ->title('Gagal memperbarui status.')
+                        ->body($exception->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            });
+    }
+
+    public static function countForStatus(?string $status = null): int
+    {
+        $user = FilamentWorkspace::user();
+        $query = $user ? AdminScope::pengajuanDataQuery($user) : PengajuanData::query();
+
+        if (filled($status)) {
+            $query->where('status', $status);
+        }
+
+        return (int) $query->count();
+    }
+
+    public static function navigationAttentionCount(): int
+    {
+        if (FilamentWorkspace::isKominfo()) {
+            return static::countForStatus('diajukan');
+        }
 
         if (FilamentWorkspace::isSubdistrict() || FilamentWorkspace::isDepartment()) {
-            $allowed = in_array($record->status, ['draft', 'revisi'], true) ? ['diajukan'] : [];
+            return static::countForStatus('revisi');
         }
 
-        if (FilamentWorkspace::isKominfo() && $record->status === 'draft') {
-            $allowed = [];
-        }
+        return 0;
+    }
 
-        return collect($allowed)
-            ->mapWithKeys(fn (string $status): array => [$status => ResourceOptions::statusData()[$status] ?? $status])
-            ->all();
+    public static function canKominfoVerifyForPage(): bool
+    {
+        return static::canKominfoVerify();
+    }
+
+    public static function canKominfoPublishForPage(): bool
+    {
+        return static::canKominfoPublish();
+    }
+
+    protected static function canKominfoVerify(): bool
+    {
+        $user = FilamentWorkspace::user();
+
+        return $user
+            ? AdminScope::hasRole($user, ['super_admin', 'admin_kominfo', 'verifikator_kominfo'])
+            : false;
+    }
+
+    protected static function canKominfoPublish(): bool
+    {
+        $user = FilamentWorkspace::user();
+
+        return $user
+            ? AdminScope::hasRole($user, ['super_admin', 'admin_kominfo'])
+            : false;
     }
 
     /**
@@ -229,7 +431,9 @@ class PengajuanDataResource extends Resource
      */
     public static function desaOptions(): array
     {
-        $query = Desa::query()->where('aktif', true)->orderBy('nama');
+        $query = Desa::query()
+            ->where('aktif', true)
+            ->orderBy('nama');
 
         if (FilamentWorkspace::isSubdistrict() && auth()->user()?->kecamatan_id) {
             $query->where('kecamatan_id', auth()->user()->kecamatan_id);
@@ -249,11 +453,30 @@ class PengajuanDataResource extends Resource
             ? AdminScope::indikatorDataQuery($user, forInput: true)
             : IndikatorData::query()->where('aktif', true);
 
-        return $query
-            ->orderBy('urutan')
-            ->orderBy('nama')
+        return AdminScope::orderIndikatorQuery($query)
             ->pluck('nama', 'id')
             ->all();
+    }
+
+    public static function canInputForRecord(PengajuanData $record): bool
+    {
+        $user = FilamentWorkspace::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if (AdminScope::isSubdistrict($user)) {
+            return filled($user->kecamatan_id)
+                && (int) $record->kecamatan_id === (int) $user->kecamatan_id;
+        }
+
+        if (AdminScope::isDepartment($user)) {
+            return filled($user->opd_id)
+                && (int) $record->opd_id === (int) $user->opd_id;
+        }
+
+        return false;
     }
 
     /**
@@ -261,7 +484,9 @@ class PengajuanDataResource extends Resource
      */
     public static function sumberDataOptions(): array
     {
-        $query = SumberData::query()->where('aktif', true)->orderBy('nama');
+        $query = SumberData::query()
+            ->where('aktif', true)
+            ->orderBy('nama');
 
         if (FilamentWorkspace::isSubdistrict() && auth()->user()?->kecamatan_id) {
             $query->where(function (Builder $builder): void {
