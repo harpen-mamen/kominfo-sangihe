@@ -3,127 +3,122 @@
 namespace App\Models;
 
 use App\Support\AdminScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Builder;
 
-class PengajuanData extends ModelIndonesia
+class PengajuanData extends Model
 {
+    use HasFactory;
+
+    /**
+     * Nama tabel diasumsikan: pengajuan_data
+     * Jika ternyata berbeda, samakan dengan schema database kamu.
+     */
     protected $table = 'pengajuan_data';
 
-    protected static function booted(): void
-    {
-        static::saving(function (self $pengajuan): void {
-            $user = auth()->user();
+    protected $fillable = [
+        'kecamatan_id',
+        'opd_id',
+        'status',
+        'catatan',
+        'catatan_verifikasi',
+        'tahun',
+        'bulan',
+        'dibuat_oleh',
+        'diupdate_oleh',
+        'payload',
+        'periode_data_id',
+        'verifikator_id',
+        'tampil_publik',
+    ];
 
-            if (! $user instanceof User) {
-                return;
-            }
+    protected $casts = [
+        'payload' => 'array',
+        'tahun' => 'integer',
+        'bulan' => 'integer',
+        'kecamatan_id' => 'integer',
+        'opd_id' => 'integer',
+        'periode_data_id' => 'integer',
+        'verifikator_id' => 'integer',
+        'tampil_publik' => 'boolean',
+    ];
 
-            if (AdminScope::isSubdistrict($user)) {
-                if (blank($user->kecamatan_id)) {
-                    throw ValidationException::withMessages([
-                        'kecamatan_id' => 'Admin kecamatan wajib terhubung dengan kecamatan aktif.',
-                    ]);
-                }
-
-                $pengajuan->kecamatan_id = $user->kecamatan_id;
-                $pengajuan->opd_id = null;
-            }
-
-            if (AdminScope::isDepartment($user)) {
-                if (blank($user->opd_id)) {
-                    throw ValidationException::withMessages([
-                        'opd_id' => 'Admin OPD wajib terhubung dengan OPD aktif.',
-                    ]);
-                }
-
-                $pengajuan->opd_id = $user->opd_id;
-                $pengajuan->kecamatan_id = null;
-            }
-
-            if (blank($pengajuan->kecamatan_id) && blank($pengajuan->opd_id)) {
-                throw ValidationException::withMessages([
-                    'kecamatan_id' => 'Pengajuan data harus terkait kecamatan atau OPD.',
-                ]);
-            }
-        });
-    }
-
-    protected function casts(): array
-    {
-        return [
-            'tanggal_kirim' => 'datetime',
-            'tanggal_verifikasi' => 'datetime',
-            'tanggal_terbit' => 'datetime',
-            'submitted_at' => 'datetime',
-            'verified_at' => 'datetime',
-            'published_at' => 'datetime',
-        ];
-    }
-
-    public function canInputValues(): bool
-    {
-        return in_array($this->status, ['draft', 'revisi'], true);
-    }
-
-    public function isPublished(): bool
-    {
-        return $this->status === 'terbit';
-    }
+    // Status workflow (dipakai oleh Filament UI)
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_DIAJUKAN = 'diajukan';
+    public const STATUS_REVISI = 'revisi';
+    public const STATUS_DISETUJUI = 'disetujui';
+    public const STATUS_DITOLAK = 'ditolak';
 
     public function kecamatan(): BelongsTo
     {
-        return $this->belongsTo(Kecamatan::class);
+        return $this->belongsTo(Kecamatan::class, 'kecamatan_id');
     }
 
+    // Dipakai oleh Widgets/Code yang melakukan ->with(['kecamatan','periodeData'])
     public function periodeData(): BelongsTo
     {
-        return $this->belongsTo(PeriodeData::class);
-    }
-
-    public function opd(): BelongsTo
-    {
-        return $this->belongsTo(Opd::class);
-    }
-
-    public function dikirimOleh(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'dikirim_oleh');
-    }
-
-    public function pengirim(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'dikirim_oleh');
-    }
-
-    public function diverifikasiOleh(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'diverifikasi_oleh');
+        return $this->belongsTo(PeriodeData::class, 'periode_data_id');
     }
 
     public function verifikator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'diverifikasi_oleh');
+        return $this->belongsTo(User::class, 'verifikator_id');
     }
 
-    public function submittedBy(): BelongsTo
+    /**
+     * Placeholder relasi untuk compat.
+     * Jika relasi asli berbeda, bisa kita sesuaikan setelah kamu tunjukkan schema tabelnya.
+     */
+    public function opd(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'submitted_by');
+        return $this->belongsTo(Opd::class, 'opd_id');
     }
 
-    public function verifiedBy(): BelongsTo
+    // Actions yang dipakai oleh PendudukResource (dan kemungkinan resources lain)
+    public function kirimKeKominfo(): void
     {
-        return $this->belongsTo(User::class, 'verified_by');
+        $this->status = static::STATUS_DIAJUKAN;
+        $this->save();
     }
 
-    public function publishedBy(): BelongsTo
+    public function setujui(int $userId, ?string $catatan = null): void
     {
-        return $this->belongsTo(User::class, 'published_by');
+        $this->status = static::STATUS_DISETUJUI;
+        $this->verifikator_id = $userId;
+        if ($catatan !== null) {
+            $this->catatan_verifikasi = $catatan;
+        }
+        $this->save();
     }
 
-    public function nilaiDataMentah(): HasMany
+    public function revisi(int $userId, string $catatan = ''): void
     {
-        return $this->hasMany(NilaiDataMentah::class);
+        $this->status = static::STATUS_REVISI;
+        $this->verifikator_id = $userId;
+        $this->catatan_verifikasi = $catatan;
+        $this->save();
+    }
+
+    public function tolak(int $userId, string $catatan = ''): void
+    {
+        $this->status = static::STATUS_DITOLAK;
+        $this->verifikator_id = $userId;
+        $this->catatan_verifikasi = $catatan;
+        $this->save();
+    }
+
+    // Scope placeholder
+    public function scopeKecamatan(Builder $query, ?int $kecamatanId): Builder
+    {
+        if ($kecamatanId) {
+            return $query->where('kecamatan_id', $kecamatanId);
+        }
+
+        return $query;
     }
 }
+
